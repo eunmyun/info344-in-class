@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset"UTF-8">
+        <title>Document</title>
+    </head>
+    <body>
+        <p>
+            give me a city name:<br>
+            <input type="text" name="city" id="city">
+            <br>
+            <button type="submit" value="Submit" id="submit">
+        </p> 
+        <script>
+            document.getElementByID("submit").onclick {
+                var cityName = document.getElementByID("city").value;
+                fetch("http://localhost:8000/zips/city/" + cityName).then(function(resp) {
+                    return resp.json()
+                }).then(function(data) {
+                    console.log(data)
+                }).catch(function(err) {
+                    console.error(err)
+                })
+            }
+        </script>
+    </body>
+</html>
