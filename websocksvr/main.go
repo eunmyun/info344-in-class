@@ -79,7 +79,7 @@ func main() {
 
 	//TODO: start the notifier by calling
 	//its .Start() method on a new goroutine
-	ctx.Notifier.Start()
+	go ctx.Notifier.Start()
 
 	http.HandleFunc("/v1/ws", ctx.WebSocketUpgradeHandler)
 	http.HandleFunc("/v1/trigger", ctx.TriggerEvent)

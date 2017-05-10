@@ -30,6 +30,7 @@ func NewNotifier() *Notifier {
 		clients: make(map[*websocket.Conn]bool),
 		mu:      sync.RWMutex{},
 	}
+	go newNotifier.Start()
 	return newNotifier
 }
 
@@ -62,7 +63,7 @@ func (n *Notifier) AddClient(client *websocket.Conn) {
 	//call n.readPump() on its own goroutine
 	//to processl of the control mesages sent
 	n.clients[client] = true
-	n.readPump(client)
+	go n.readPump(client)
 
 }
 
