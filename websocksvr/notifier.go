@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/gorilla/websocket"
 )
 
@@ -8,6 +11,8 @@ import (
 type Notifier struct {
 	eventq  chan interface{}
 	clients map[*websocket.Conn]bool
+	mu      sync.RWMutex
+
 	//TODO: add other fields you might need
 	//such as another channel or a mutex
 	//(either would work)
@@ -20,7 +25,12 @@ type Notifier struct {
 func NewNotifier() *Notifier {
 	//TODO: create, initialize and return
 	//a Notifier struct
-	return nil
+	newNotifier := &Notifier{
+		eventq:  make(chan interface{}),
+		clients: make(map[*websocket.Conn]bool),
+		mu:      sync.RWMutex{},
+	}
+	return newNotifier
 }
 
 //Start begins a loop that checks for new events
@@ -32,6 +42,10 @@ func (n *Notifier) Start() {
 	//this should check for new events written
 	//to the `eventq` channel, and broadcast
 	//them to all of the web socket clients
+	for {
+		event := <-n.eventq
+		n.broadcast(event)
+	}
 }
 
 //AddClient adds a new web socket client to the Notifer
@@ -41,12 +55,21 @@ func (n *Notifier) AddClient(client *websocket.Conn) {
 	//an HTTP handler, and each HTTP request is
 	//processed on its own goroutine, so your
 	//implementation here MUST be safe for concurrent use
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	//after you add the client to the map,
+	//call n.readPump() on its own goroutine
+	//to processl of the control mesages sent
+	n.clients[client] = true
+	n.readPump(client)
 
 }
 
 //Notify will add a new event to the event queue
 func (n *Notifier) Notify(event interface{}) {
 	//TODO: add the `event` to the `eventq`
+	n.eventq <- event
 }
 
 //readPump will read all messages (including control messages)
@@ -58,6 +81,13 @@ func (n *Notifier) readPump(client *websocket.Conn) {
 	//TODO: implement this according to the notes in the
 	//Control Message section of the Gorilla Web Socket docs:
 	//https://godoc.org/github.com/gorilla/websocket#hdr-Control_Messages
+	for {
+		if _, _, err := client.NextReader(); err != nil {
+			client.Close()
+			fmt.Printf("error reading messages %v\n", err)
+			break
+		}
+	}
 
 }
 
@@ -70,6 +100,15 @@ func (n *Notifier) broadcast(event interface{}) {
 	//and for even better performance, try using a PreparedMessage:
 	//https://godoc.org/github.com/gorilla/websocket#PreparedMessage
 	//https://godoc.org/github.com/gorilla/websocket#Conn.WritePreparedMessage
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	for client := range n.clients {
+		if err := client.WriteJSON(event); err != nil {
+			client.Close()
+			delete(n.clients, client)
+		}
+	}
 
 	//If you get an error while writing to a client,
 	//the client has wandered off, so you should call
